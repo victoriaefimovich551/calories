@@ -1,6 +1,6 @@
 // Ежедневное напоминание от бота. Запускается по расписанию из GitHub Actions
 // (.github/workflows/remind.yml). Токен и список чатов берутся из секретов репозитория —
-// в этот файл их вписывать нельзя.
+// в этот файл их вписывать нельзя.ю
 
 const TOKEN = process.env.BOT_TOKEN;
 const CHAT_IDS = (process.env.CHAT_IDS || '').split(/[\s,;]+/).filter(Boolean);
