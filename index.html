@@ -62,6 +62,8 @@ input:focus,select:focus{border-color:var(--accent)}
 .totals{display:flex;justify-content:space-around;text-align:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .totals b{display:block;font-size:17px}
 
+.event{display:flex;align-items:center;gap:14px;width:100%;text-align:left}
+.event .big-n{font-size:34px;font-weight:700;color:var(--accent);min-width:56px;text-align:center}
 /* Приёмы пищи */
 .meal-h{display:flex;justify-content:space-between;align-items:baseline}
 .meal-h b{font-size:16px}
@@ -402,7 +404,7 @@ function sum(entries) {
 }
 
 /* ---------- Состояние ---------- */
-var S = { tab: 'diary', date: today(), entries: [], profile: null, my: [], recent: [], stats: null };
+var S = { tab: 'diary', date: today(), entries: [], profile: null, my: [], recent: [], stats: null, event: { t: 'Новый год', d: '2027-01-01' } };
 var sheet = null; // текущее состояние шторки
 
 function calcGoal(p) {
@@ -411,6 +413,21 @@ function calcGoal(p) {
   var bmr = 10 * p.w + 6.25 * p.h - 5 * p.age + (p.sex === 'm' ? 5 : -161); // Миффлин — Сан-Жеор
   var k = bmr * p.act * (p.goal === 'lose' ? 0.85 : p.goal === 'gain' ? 1.15 : 1);
   return Math.max(1200, Math.round(k / 10) * 10);
+}
+function plural(n, forms) {
+  var a = Math.abs(n) % 100, b = a % 10;
+  return forms[a > 10 && a < 20 ? 2 : b === 1 ? 0 : b >= 2 && b <= 4 ? 1 : 2];
+}
+/* Счётчик дней до события: дата и название задаются в профиле */
+function eventHtml() {
+  var e = S.event, m = e && /^(\d{4})-(\d{2})-(\d{2})$/.exec(e.d || '');
+  if (!m) return '';
+  var left = Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - today()) / 864e5);
+  if (left < 0) return '';
+  var title = esc(e.t || 'Событие');
+  return '<button class="card event" data-act="tab" data-tab="profile"><span class="big-n num">' + (left ? left : '🎉') + '</span><span>' +
+    (left ? '<b>' + plural(left, ['день', 'дня', 'дней']) + '</b> до события<br>' : '<b>Сегодня!</b><br>') +
+    '<span class="hint">' + title + '</span></span></button>';
 }
 function macroGoals(kcal) { return { p: Math.round(kcal * 0.3 / 4), f: Math.round(kcal * 0.3 / 9), c: Math.round(kcal * 0.4 / 4) }; }
 
@@ -448,6 +465,7 @@ function diaryHtml() {
   h += '</div></div><div class="totals"><div><b class="num">' + Math.round(t.k) + '</b><span class="hint">съедено</span></div>' +
     '<div><b class="num">' + goal + '</b><span class="hint">норма</span></div></div></div>';
 
+  h += eventHtml();
   if (!S.profile) h += '<button class="card hint" style="width:100%;text-align:left" data-act="tab" data-tab="profile">' +
     'Сейчас норма — 2000 ккал по умолчанию. <span style="color:var(--accent)">Заполните профиль</span>, чтобы рассчитать свою.</button>';
 
@@ -528,6 +546,10 @@ function profileHtml() {
       '<div class="hint" style="text-align:center">Б ' + mg.p + ' г · Ж ' + mg.f + ' г · У ' + mg.c + ' г</div>'
     : '<div class="hint">Укажите возраст, рост и вес — норма рассчитается по формуле Миффлина — Сан-Жеора.</div>') + '</div>';
   h += '<button class="btn" data-act="psave"' + (preview ? '' : ' style="opacity:.5"') + '>Сохранить</button>' +
+    '<div class="card" style="margin-top:12px"><b>Счётчик до события</b>' +
+    '<label>Название</label><input data-ev="t" maxlength="40" placeholder="Например, отпуск" value="' + esc(S.event.t || '') + '">' +
+    '<label>Дата</label><input data-ev="d" type="date" value="' + esc(S.event.d || '') + '">' +
+    '<p class="hint" style="margin:10px 0 0">Счётчик показывается в дневнике. Чтобы убрать его, очистите дату.</p></div>' +
     '<p class="hint" style="text-align:center;margin-top:14px">' + (cloud ? 'Данные хранятся в вашем облаке Telegram и доступны на всех устройствах.' : 'Данные хранятся на этом устройстве.') +
     '<br>База товаров: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener" style="color:inherit">Open Food Facts</a>, лицензия ODbL.</p>';
   return h;
@@ -736,11 +758,16 @@ document.addEventListener('input', function (ev) {
     document.querySelector('[data-act="psave"]').style.opacity = tmp.querySelector('[data-act="psave"]').style.opacity;
   }
 });
-document.addEventListener('change', function (ev) { if (ev.target.dataset.pf === 'act') draft.act = ev.target.value; });
+document.addEventListener('change', function (ev) {
+  var t = ev.target;
+  if (t.dataset.pf === 'act') draft.act = t.value;
+  if (t.dataset.ev) { S.event[t.dataset.ev] = t.value.trim(); store.set('event', S.event); }
+});
 
 /* ---------- Запуск ---------- */
 render();
-store.getMany(['profile', 'my', 'recent', 'd_' + dkey(S.date)]).then(function (o) {
+store.getMany(['profile', 'my', 'recent', 'event', 'd_' + dkey(S.date)]).then(function (o) {
+  if (o.event && typeof o.event === 'object') S.event = { t: String(o.event.t || ''), d: String(o.event.d || '') };
   S.profile = o.profile && typeof o.profile === 'object' ? o.profile : null;
   S.my = Array.isArray(o.my) ? o.my : [];
   S.recent = Array.isArray(o.recent) ? o.recent : [];
