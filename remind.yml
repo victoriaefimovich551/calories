@@ -1,0 +1,27 @@
+name: Напоминание от бота
+
+on:
+  schedule:
+    # Время в UTC. 17:07 UTC = 20:07 по Москве. GitHub может задержать запуск на 5–30 минут.
+    - cron: '7 17 * * *'
+  workflow_dispatch: # кнопка «Run workflow» для ручной проверки
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node remind.mjs
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_IDS: ${{ secrets.CHAT_IDS }}
+          # Счётчик: дата (ГГГГ-ММ-ДД) и название в родительном падеже — «до чего?»
+          EVENT_DATE: '2027-01-01'
+          EVENT_TITLE: 'Нового года'
+          TIMEZONE: 'Europe/Moscow'
