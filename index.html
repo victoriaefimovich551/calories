@@ -441,6 +441,21 @@ function loadDay() {
 }
 function saveDay() { store.set('d_' + dkey(S.date), S.entries); S.stats = null; }
 
+/* Итоги дня текстом: отправляются в выбранный чат от имени самого пользователя */
+var BOT_LINK = 'https://t.me/CalorieSSSSSBot?startapp'; // ссылка на бота, подставляется в сообщение
+function shareText() {
+  var goal = calcGoal(S.profile), t = sum(S.entries);
+  var lines = ['🍽 ' + dateTitle(S.date) + ': ' + Math.round(t.k) + ' из ' + goal + ' ккал',
+    'Б ' + Math.round(t.p) + ' г · Ж ' + Math.round(t.f) + ' г · У ' + Math.round(t.c) + ' г', ''];
+  MEALS.forEach(function (name, mi) {
+    var list = S.entries.filter(function (e) { return e.m === mi; });
+    if (!list.length) return;
+    lines.push(name + ' — ' + Math.round(sum(list).k) + ' ккал: ' + list.map(function (e) { return e.n + ' (' + r1(e.g) + ' г)'; }).join(', '));
+  });
+  var text = lines.join('\n');
+  return text.length > 1500 ? text.slice(0, 1500) + '…' : text;
+}
+
 /* ---------- Отрисовка ---------- */
 function render() {
   document.querySelectorAll('.tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === S.tab); });
@@ -479,6 +494,7 @@ function diaryHtml() {
     });
     h += '<button class="add" data-act="add" data-m="' + mi + '">+ Добавить</button></div>';
   });
+  if (S.entries.length) h += '<button class="btn ghost" data-act="share">📤 Поделиться итогами дня в чате</button>';
   return h;
 }
 
@@ -697,6 +713,11 @@ var actions = {
     openSheet({ mode: 'amount', index: +d.i, meal: e.m, g: e.g, food: { n: e.n, k: e.k, p: e.p, f: e.f, c: e.c, g: 0 } });
   },
   close: closeSheet,
+  share: function () {
+    var url = 'https://t.me/share/url?url=' + encodeURIComponent(BOT_LINK) + '&text=' + encodeURIComponent(shareText());
+    try { if (inTg && tg.openTelegramLink) { tg.openTelegramLink(url); return; } } catch (e) {}
+    window.open(url, '_blank');
+  },
   pick: function (d) {
     var f = sheet.list[+d.i]; if (!f) return;
     if (f.s) f = { n: f.b && norm(f.n).indexOf(norm(f.b)) < 0 ? f.n + ' (' + f.b + ')' : f.n, k: f.k, p: f.p, f: f.f, c: f.c, g: 0 };
